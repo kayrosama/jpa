@@ -1,0 +1,8 @@
+#!/bin/bash
+
+# Capturar el path raíz del proyecto
+HOME_APP="$(cd "$(dirname "$0")" && pwd)"
+
+# Ejecutar el script principal
+/usr/bin/python3 "$HOME_APP/main.py"
+

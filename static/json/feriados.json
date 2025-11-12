@@ -1,0 +1,14 @@
+{
+  "feriados_fijos": [
+    { "mes": 1, "dia": 1 },
+    { "mes": 8, "dia": 15 },
+    { "mes": 9, "dia": 15 },
+    { "mes": 11, "dia": 1 },
+    { "mes": 12, "dia": 25 }
+  ],
+  "feriados_trasladables": [
+    { "mes": 5, "dia": 1 },
+    { "mes": 6, "dia": 30 },
+    { "mes": 10, "dia": 20 }
+  ]
+}

@@ -1,0 +1,53 @@
+[
+  {
+    "getLogin": [
+      {
+        "url": "https://jobpoint.claro.com.gt:6112/JobPointAPI/login",
+        "body": {
+          "username": "",
+          "password": "",
+          "business": 0
+        }
+      }
+    ]
+  },
+  {
+    "getTransaction": [
+      {
+        "url": "https://jobpoint.claro.com.gt:6112/JobPointAPI/transaction",
+        "body": {
+          "token": ""
+        }
+      }
+    ]
+  },
+  {
+    "getReservation": [
+      {
+        "url": "https://jobpoint.claro.com.gt:6112/JobPointAPI/reservation?type=normal",
+        "body": {
+          "startdate": "",
+          "enddate": "",
+          "workerid": 0,
+          "workplaceid": 0,
+          "floorid": 0,
+          "typeId": 0
+        }
+      }
+    ]
+  },
+  {
+    "getVerification": [
+      {
+        "url": "https://jobpoint.claro.com.gt:6112/JobPointAPI/reservation?workerId={workerid}&startDate={fecha} 00:00:00&endDate={fecha} 23:59:59"
+      }
+    ]
+  },
+  {
+    "getCheckIn": [
+      {
+        "url": "https://jobpoint.claro.com.gt:6112/JobPointAPI/reservation/{reservationid}?type=checkin"
+      }
+    ]
+  }
+]
