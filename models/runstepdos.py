@@ -26,14 +26,13 @@ class RunTwo:
 
         try:
             log("RunTwo.getReserva - Ejecutando proceso para obtener Reservation.")
-            step_reserva_entry = next((ep.get("getReservation") for ep in self.endpoints if "getReservation" in ep), None)
-            if not step_reserva_entry:
+            step_reserva = next((ep for ep in self.endpoints if "getReservation" in ep), None)
+            if not step_reserva:
                 return {"status": "ERROR", "message": "RunTwo.getReserva - No se encontro configuracion para getReservation."}
-            step_reserva = step_reserva_entry[0]
 
             if not token:
                 log("RunTwo.getReserva - Token no disponible, omitiendo en getReserva.")
-                return {"status": "ERROR", "message": "RunTwo.getReserva - Token no disponible, omitiendo en getReserva."}
+                return {"status": "ERROR", "message": "RunTwo.getReserva - Omitiendo en getReserva porque el token transaction no esta disponible."}
 
             fecha_objetivo = datetime.date.today() + datetime.timedelta(days=30)
             fecha_str = fecha_objetivo.strftime("%d-%m-%Y")
@@ -55,12 +54,12 @@ class RunTwo:
                     "message": f"RunTwo.getReserva - Omitiendo reserva porque la fecha {fecha_str} es feriado no trasladado."
                 }
 
-            # Verificar si ya existe una reserva para ese día
+            # Verificar si ya existe una reserva para ese dia
             verificador = VerificadorReserva()
             reserva_existente = verificador.existe_reserva(token, workerid, fecha_str)
 
             if reserva_existente:
-                log(f"RunTwo.getReserva - Ya existe una reserva para el trabajador {workerid} el día {fecha_str}. ID: {reserva_existente}")
+                log(f"RunTwo.getReserva - Ya existe una reserva para el trabajador {workerid} el dia {fecha_str}. ID: {reserva_existente}")
                 return {
                     "status": "OMITIDO",
                     "message": f"RunTwo.getReserva - Omitiendo reserva porque ya existe una reserva para la fecha {fecha_str}.",
@@ -69,8 +68,9 @@ class RunTwo:
 
             # Preparar body para la reserva
             body = deepcopy(step_reserva["body"])
+            body = deepcopy(step_reserva["getReservation"][0]["body"])
             body.update({
-                "startdate": f"{fecha_str} 08:00:00",
+                "startdate": f"{fecha_str} 07:00:00",
                 "enddate": f"{fecha_str} 19:00:00",
                 "workerid": workerid,
                 "workplaceid": workplaceid,
@@ -96,7 +96,7 @@ class RunTwo:
             log(f"RunTwo.getReserva - Respuesta getReserva: {data}")
             return {
                 "status": status,
-                "message": "RunTwo.getReserva - Reserva realizada con éxito." if status == "OK" else "RunTwo.getReserva - Error en respuesta de reservation",
+                "message": "RunTwo.getReserva - Reserva realizada con exito." if status == "OK" else "RunTwo.getReserva - Error en respuesta de reservation",
                 "reservationid": reservation_id
             }
 
@@ -109,20 +109,17 @@ class RunTwo:
         workerid = self.data_user.get("workerid")
         try:
             log("RunTwo.getCheckIn - Ejecutando proceso para hacer CheckIn.")
-            step_verify_entry = next((ep.get("getVerification") for ep in self.endpoints if "getVerification" in ep), None)
-            if not step_verify_entry:
+
+            step_verify = next((ep for ep in self.endpoints if "getVerification" in ep), None) 
+            if not step_verify:
+                log("RunTwo.getVerification - No se encontro configuracion para getVerification.")
                 return {"status": "ERROR", "message": "RunTwo.getCheckIn - No se encontro configuracion para getVerification."}
-            step_verify = step_verify_entry[0] 
-
-            step_checkin_entry = next((ep.get("getCheckIn") for ep in self.endpoints if "getCheckIn" in ep), None)
-            if not step_checkin_entry:
+            
+            step_checkin = next((ep for ep in self.endpoints if "getCheckIn" in ep), None) 
+            if not step_checkin:
+                log("RunTwo.getCheckIn - No se encontro configuracion para getCheckIn.")
                 return {"status": "ERROR", "message": "RunTwo.getCheckIn - No se encontro configuracion para getCheckIn."}
-            step_checkin = step_checkin_entry[0] 
-
-            if not step_verify or not step_checkin:
-                log("RunTwo.getCheckIn - No se encontro configuracion para el paso Verification o CheckIn.")
-                return {"status": "ERROR", "message": "RunTwo.getCheckIn - No se encontro configuracion para el paso Verification o CheckIn."}
-
+            
             if not token or not workerid:
                 log("RunTwo.getCheckIn - Token o workerId no disponible, omitiendo en getCheckIn.")
                 return {"status": "ERROR", "message": "RunTwo.getCheckIn - Token o workerId no disponible, omitiendo en getCheckIn."}
@@ -137,7 +134,7 @@ class RunTwo:
                 }
 
             fecha_str = hoy.strftime("%d-%m-%Y")
-            url_get = step_verify["url"].replace("{workerid}", str(workerid)).replace("{fecha}", fecha_str)
+            url_get = step_verify["getVerification"][0]["url"].replace("{workerid}", str(workerid)).replace("{fecha}", fecha_str)
             headers = {"token": token}
 
             response = requests.get(url_get, headers=headers, timeout=10)
@@ -145,6 +142,9 @@ class RunTwo:
 
             status = data.get("status")
             reply = data.get("reply", []) if status == "OK" else []
+
+            log(f"Verifica Reserva --> Datos: {data}")
+            log(f"Verifica Reserva --> reply: {reply}")
 
             if status == "OK" and isinstance(reply, list) and reply:
                 reservationid = reply[0].get("reservationid", "")
@@ -154,14 +154,14 @@ class RunTwo:
                     log(f"RunTwo.getCheckIn - Usando delay de {delay_segundos} segundos antes de hacer CheckIn.")
                     time.sleep(delay_segundos)
                 
-                url_put = step_checkin["url"].replace("{reservationid}", str(reservationid))
+                url_put = step_checkin["getCheckIn"][0]["url"].replace("{reservationid}", str(reservationid))
                 response_put = requests.put(url_put, headers=headers, timeout=10)
                 data_put = response_put.json()
 
                 log(f"RunTwo.getCheckIn - Respuesta getCheckIn PUT: {data_put}")
                 return {
                     "status": data_put.get("status"),
-                    "message": "RunTwo.getCheckIn - CheckIn realizado con éxito." if data_put.get("status") == "OK" else "RunTwo.getCheckIn - Error en CheckIn",
+                    "message": "RunTwo.getCheckIn - CheckIn realizado con exito." if data_put.get("status") == "OK" else "RunTwo.getCheckIn - Error en CheckIn",
                     "response": data_put
                 }
             else:

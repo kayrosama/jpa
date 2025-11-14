@@ -16,11 +16,7 @@ class JsonFormatter(logging.Formatter):
     def format(self, record):
         log_record = {
             "timestamp": datetime.now().isoformat(),
-            "logger": record.name,
             "level": record.levelname,
-            "module": record.module,
-            "function": record.funcName,
-            "line": record.lineno,
             "message": record.getMessage()
         }
         if record.exc_info:
