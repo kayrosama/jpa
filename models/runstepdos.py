@@ -110,64 +110,69 @@ class RunTwo:
         try:
             log("RunTwo.getCheckIn - Ejecutando proceso para hacer CheckIn.")
 
-            step_verify = next((ep for ep in self.endpoints if "getVerification" in ep), None) 
+            step_verify = next((ep for ep in self.endpoints if "getVerification" in ep), None)
             if not step_verify:
-                log("RunTwo.getVerification - No se encontro configuracion para getVerification.")
-                return {"status": "ERROR", "message": "RunTwo.getCheckIn - No se encontro configuracion para getVerification."}
-            
-            step_checkin = next((ep for ep in self.endpoints if "getCheckIn" in ep), None) 
-            if not step_checkin:
-                log("RunTwo.getCheckIn - No se encontro configuracion para getCheckIn.")
-                return {"status": "ERROR", "message": "RunTwo.getCheckIn - No se encontro configuracion para getCheckIn."}
-            
-            if not token or not workerid:
-                log("RunTwo.getCheckIn - Token o workerId no disponible, omitiendo en getCheckIn.")
-                return {"status": "ERROR", "message": "RunTwo.getCheckIn - Token o workerId no disponible, omitiendo en getCheckIn."}
+                return {"status": "ERROR", "message": "No se encontro configuracion para getVerification."}
 
+            step_checkin = next((ep for ep in self.endpoints if "getCheckIn" in ep), None)
+            if not step_checkin:
+                return {"status": "ERROR", "message": "No se encontro configuracion para getCheckIn."}
+    
+            if not token or not workerid:
+                return {"status": "ERROR", "message": "Token o workerId no disponible."}
+    
             hoy = datetime.date.today()
-            log(f"RunTwo.getCheckIn - Fecha actual para checkin: {hoy}")
             if es_feriado_avanzado(hoy, "checkin"):
-                log(f"RunTwo.getCheckIn - Omitiendo CheckIn porque la fecha {hoy} es feriado efectivo.")
-                return {
-                    "status": "OMITIDO",
-                    "message": f"RunTwo.getCheckIn - Omitiendo CheckIn porque la fecha {hoy.strftime('%d-%m-%Y')} es feriado efectivo."
-                }
+                return {"status": "OMITIDO", "message": f"Omitiendo CheckIn porque la fecha {hoy.strftime('%d-%m-%Y')} es feriado efectivo."}
 
             fecha_str = hoy.strftime("%d-%m-%Y")
             url_get = step_verify["getVerification"][0]["url"].replace("{workerid}", str(workerid)).replace("{fecha}", fecha_str)
             headers = {"token": token}
-
+    
             response = requests.get(url_get, headers=headers, timeout=10)
             data = response.json()
-
+    
             status = data.get("status")
             reply = data.get("reply", []) if status == "OK" else []
-
-            log(f"Verifica Reserva --> Datos: {data}")
-            log(f"Verifica Reserva --> reply: {reply}")
-
+    
             if status == "OK" and isinstance(reply, list) and reply:
                 reservationid = reply[0].get("reservationid", "")
                 delay_segundos = random.randint(15, 180)
-
+    
                 if usar_delay:
-                    log(f"RunTwo.getCheckIn - Usando delay de {delay_segundos} segundos antes de hacer CheckIn.")
+                    log(f"Usando delay de {delay_segundos} segundos antes de hacer CheckIn.")
                     time.sleep(delay_segundos)
-                
+    
                 url_put = step_checkin["getCheckIn"][0]["url"].replace("{reservationid}", str(reservationid))
-                response_put = requests.put(url_put, headers=headers, timeout=10)
-                data_put = response_put.json()
-
-                log(f"RunTwo.getCheckIn - Respuesta getCheckIn PUT: {data_put}")
+    
+                # Intentar hasta 3 veces si status != OK o hay error de conexión
+                intentos = 0
+                data_put = {}
+                while intentos < 3:
+                    try:
+                        response_put = requests.put(url_put, headers=headers, timeout=10)
+                        data_put = response_put.json()
+                        log(f"Intento {intentos+1} - Respuesta PUT: {data_put}")
+    
+                        if data_put.get("status") == "OK":
+                            break  # Éxito, salir del bucle
+                    except requests.exceptions.RequestException as e:
+                        log(f"Error de conexión en intento {intentos+1}: {str(e)}")
+    
+                    intentos += 1
+                    if intentos < 3:
+                        log("Reintentando en 60 segundos...")
+                        time.sleep(60)
+    
                 return {
-                    "status": data_put.get("status"),
-                    "message": "RunTwo.getCheckIn - CheckIn realizado con exito." if data_put.get("status") == "OK" else "RunTwo.getCheckIn - Error en CheckIn",
+                    "status": data_put.get("status", "ERROR"),
+                    "message": "CheckIn realizado con exito." if data_put.get("status") == "OK" else "Error en CheckIn",
                     "response": data_put
                 }
             else:
-                log(f"RunTwo.getCheckIn - No se encontro reserva para hoy. Respuesta GET: {data}")
-                return {"status": "ERROR", "message": "RunTwo.getCheckIn - No se encontro reserva para hoy.", "response": data}
-
+                return {"status": "ERROR", "message": "No se encontro reserva para hoy.", "response": data}
+    
         except Exception as e:
-            log(f"RunTwo.getCheckIn - Excepcion en getCheckIn: {str(e)}")
-            return {"status": "ERROR", "message": f"RunTwo.getCheckIn - Excepcion en getCheckIn: {str(e)}"}
+            log(f"Excepcion en getCheckIn: {str(e)}")
+            return {"status": "ERROR", "message": f"Excepcion en getCheckIn: {str(e)}"}
+            
