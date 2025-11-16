@@ -23,87 +23,90 @@ class RunTwo:
         workplaceid = self.data_user.get("workplaceid")
         floorid = self.data_user.get("floorid")
         typeid = self.data_user.get("typeid")
-
+    
         try:
             log("RunTwo.getReserva - Ejecutando proceso para obtener Reservation.")
             step_reserva = next((ep for ep in self.endpoints if "getReservation" in ep), None)
             if not step_reserva:
-                return {"status": "ERROR", "message": "RunTwo.getReserva - No se encontro configuracion para getReservation."}
-
+                return {"status": "ERROR", "message": "RunTwo.getReserva - No se encontró configuración para getReservation."}
+    
             if not token:
                 log("RunTwo.getReserva - Token no disponible, omitiendo en getReserva.")
-                return {"status": "ERROR", "message": "RunTwo.getReserva - Omitiendo en getReserva porque el token transaction no esta disponible."}
-
+                return {"status": "ERROR", "message": "RunTwo.getReserva - Omitiendo en getReserva porque el token transaction no está disponible."}
+    
             fecha_objetivo = datetime.date.today() + datetime.timedelta(days=30)
             fecha_str = fecha_objetivo.strftime("%d-%m-%Y")
-            log(f"RunTwo.getReserva - Fecha objetivo para reserva: {fecha_str}")
-
+            log(f"RunTwo.getReserva - Fecha objetivo para reserva: {fecha_str}") 
+    
             # Validar si la fecha cae en fin de semana
-            if fecha_objetivo.weekday() in [5, 6]:  # 5 = sábado, 6 = domingo
+            if fecha_objetivo.weekday() in [5, 6]:
                 log(f"RunTwo.getReserva - Omitiendo reserva porque la fecha {fecha_str} cae en fin de semana.")
-                return {
-                    "status": "OMITIDO",
-                    "message": f"RunTwo.getReserva - Omitiendo reserva porque la fecha {fecha_str} cae en fin de semana."
-                }
-
+                return {"status": "OMITIDO", "message": f"RunTwo.getReserva - Fecha {fecha_str} cae en fin de semana."}
+    
             # Validar si es feriado
             if es_feriado_avanzado(fecha_objetivo, "reserva"):
                 log(f"RunTwo.getReserva - Omitiendo reserva porque la fecha {fecha_str} es feriado no trasladado.")
-                return {
-                    "status": "OMITIDO",
-                    "message": f"RunTwo.getReserva - Omitiendo reserva porque la fecha {fecha_str} es feriado no trasladado."
-                }
-
-            # Verificar si ya existe una reserva para ese dia
+                return {"status": "OMITIDO", "message": f"RunTwo.getReserva - Fecha {fecha_str} es feriado no trasladado."}    
+    
+            # Verificar si ya existe una reserva para ese día
             verificador = VerificadorReserva()
             reserva_existente = verificador.existe_reserva(token, workerid, fecha_str)
-
-            if reserva_existente:
-                log(f"RunTwo.getReserva - Ya existe una reserva para el trabajador {workerid} el dia {fecha_str}. ID: {reserva_existente}")
+    
+            log(f"RunTwo.getReserva - Resultado existe_reserva: {reserva_existente}")
+    
+            # Nueva lógica basada en la respuesta
+            if reserva_existente == "0":
+                log("RunTwo.getReserva - No existe reserva previa, se procederá a crear una nueva.")
+                # Preparar body para la reserva
+                body = deepcopy(step_reserva["getReservation"][0]["body"])
+                body.update({
+                    "startdate": f"{fecha_str} 07:00:00",
+                    "enddate": f"{fecha_str} 19:00:00",
+                    "workerid": workerid,
+                    "workplaceid": workplaceid,
+                    "floorid": floorid,
+                    "typeId": typeid
+                })
+    
+                log(f"RunTwo.getReserva.reserva_existente - Datos para reserva: {body}")
+                url = step_reserva["getReservation"][0]["url"]
+                log(f"RunTwo.getReserva.reserva_existente.url - URL para reserva: {url}")
+                headers = {"Content-Type": "application/x-www-form-urlencoded", "token": token}
+    
+                response = requests.post(url, headers=headers, data=body, timeout=10)
+                data = response.json()
+                status = data.get("status")
+                reply = data.get("reply", {}) if status == "OK" else {}
+                reservation_id = reply.get("reservationid", "")
+                if not reservation_id and isinstance(reply, list) and reply:
+                    reservation_id = reply[0].get("reservationid", "")
+    
+                log(f"RunTwo.getReserva.data - Respuesta getReserva: {data}")
                 return {
-                    "status": "OMITIDO",
-                    "message": f"RunTwo.getReserva - Omitiendo reserva porque ya existe una reserva para la fecha {fecha_str}.",
+                    "status": status,
+                    "message": "RunTwo.getReserva - Reserva realizada con éxito." if status == "OK" else "RunTwo.getReserva - Error en respuesta de reservation",
+                    "reservationid": reservation_id
+                }
+    
+            elif reserva_existente.isdigit() and int(reserva_existente) > 0:
+                log(f"RunTwo.getReserva - Ya existe una reserva (ID: {reserva_existente}), se procederá con check-in.")
+                return {
+                    "status": "CHECKIN",
+                    "message": f"RunTwo.getReserva - Continuar con check-in para la reserva {reserva_existente}.",
                     "reservationid": reserva_existente
                 }
 
-            # Preparar body para la reserva
-            body = deepcopy(step_reserva["body"])
-            body = deepcopy(step_reserva["getReservation"][0]["body"])
-            body.update({
-                "startdate": f"{fecha_str} 07:00:00",
-                "enddate": f"{fecha_str} 19:00:00",
-                "workerid": workerid,
-                "workplaceid": workplaceid,
-                "floorid": floorid,
-                "typeId": typeid
-            })
-
-            log(f"RunTwo.getReserva - Datos para reserva: {body}")
-
-            url = step_reserva["url"]
-            headers = {"Content-Type": "application/x-www-form-urlencoded", "token": token}
-
-            response = requests.post(url, headers=headers, data=body, timeout=10)
-            data = response.json()
-
-            status = data.get("status")
-            reply = data.get("reply", {}) if status == "OK" else {}
-
-            reservation_id = reply.get("reservationid", "")
-            if not reservation_id and isinstance(reply, list) and reply:
-                reservation_id = reply[0].get("reservationid", "")
-
-            log(f"RunTwo.getReserva - Respuesta getReserva: {data}")
-            return {
-                "status": status,
-                "message": "RunTwo.getReserva - Reserva realizada con exito." if status == "OK" else "RunTwo.getReserva - Error en respuesta de reservation",
-                "reservationid": reservation_id
-            }
-
+            else:
+                log("RunTwo.getReserva - Error: No se pudo determinar el estado de la reserva.")
+                return {
+                    "status": "ERROR",
+                    "message": "RunTwo.getReserva - No se pudo determinar el estado de la reserva (respuesta vacía o inválida)."
+                }
+    
         except Exception as e:
-            log(f"RunTwo.getReserva - Excepcion en getReserva: {str(e)}")
-            return {"status": "ERROR", "message": f"RunTwo.getReserva - Excepcion en getReserva: {str(e)}"}
-
+            log(f"RunTwo.getReserva - Excepción en getReserva: {str(e)}")
+            return {"status": "ERROR", "message": f"RunTwo.getReserva - Excepción en getReserva: {str(e)}"}
+    
     def getCheckIn(self, usar_delay: bool = False, delay_segundos: int = 0) -> dict:
         token = self.data_user.get("token_trx")
         workerid = self.data_user.get("workerid")
@@ -175,4 +178,4 @@ class RunTwo:
         except Exception as e:
             log(f"Excepcion en getCheckIn: {str(e)}")
             return {"status": "ERROR", "message": f"Excepcion en getCheckIn: {str(e)}"}
-            
+    

@@ -6,3 +6,6 @@ HOME_APP="$(cd "$(dirname "$0")" && pwd)"
 # Ejecutar el script principal
 /usr/bin/python3 "$HOME_APP/main.py"
 
+# CheckPoint
+echo -e "\nCheckPoint - `date`\n" >> logs/SystemOut.log
+
