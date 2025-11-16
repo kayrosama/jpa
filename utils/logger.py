@@ -15,7 +15,7 @@ os.makedirs(LOG_DIR, exist_ok=True)
 class JsonFormatter(logging.Formatter):
     def format(self, record):
         log_record = {
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": int(datetime.now().timestamp()),
             "level": record.levelname,
             "message": record.getMessage()
         }

@@ -55,7 +55,7 @@ def ejecutar_jobpoint():
     try:
         checkin = NiBan.getCheckIn()
         if checkin["status"] != "OK":
-            log("CheckIn fallido.")
+            log(f"CheckIn fallido.")
         else:
             log("CheckIn completado correctamente.")
     except Exception as e:
@@ -65,3 +65,4 @@ def ejecutar_jobpoint():
 
 if __name__ == "__main__":
     ejecutar_jobpoint()
+
